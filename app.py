@@ -137,7 +137,7 @@ class BMICalculator(BaseCalculator):
         return MeasurementResult(cat, round(bmi, 2), {"input": f"{weight}kg/{height}m"})
 
 class AcademicCalculator(BaseCalculator):
-    def calculate_group(self, students_data: List[Dict]) -> Tuple[MeasurementResult, Dict]:
+    def calculate(self, students_data: List[Dict]) -> Tuple[MeasurementResult, Dict]:
         results = []
         for s in students_data:
             avg = sum(s['grades']) / 3
@@ -248,7 +248,7 @@ def view_module_academic(ledger: LedgerManager):
     
     if st.button("PROCESAR ESTADÍSTICAS DEL GRUPO"):
         calc = AcademicCalculator()
-        res, top = calc.calculate_group(students_input)
+        res, top = calc.calculate(students_input)
         ledger.add(res, "ACADEMIC")
         
         st.markdown(f"""

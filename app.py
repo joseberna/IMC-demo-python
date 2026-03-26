@@ -3,18 +3,20 @@ import datetime
 import uuid
 import pandas as pd
 import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
-    page_title="CyberMetric Hub - Web3 Analytics",
+    page_title="CyberMetric Hub v2.0",
     page_icon="🧬",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
-# --- ESTILOS CYBERPUNK / GLASSMORPHISM ---
+# --- ESTILOS CYBERPUNK / GLASSMORPHISM (V2) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap');
@@ -31,6 +33,23 @@ st.markdown("""
         background: radial-gradient(circle at 50% 50%, #1a1b3a 0%, #0a0b1e 100%);
         color: white;
         font-family: 'Rajdhani', sans-serif;
+        overflow-x: hidden;
+    }
+
+    /* Sidebar Styling */
+    [data-testid="stSidebar"] {
+        background: rgba(10, 11, 30, 0.95) !important;
+        border-right: 1px solid var(--neon-cyan);
+        backdrop-filter: blur(15px);
+    }
+
+    .sidebar-title {
+        font-family: 'Orbitron', sans-serif;
+        color: var(--neon-cyan);
+        text-align: center;
+        padding: 20px 0;
+        border-bottom: 1px solid var(--glass-border);
+        margin-bottom: 20px;
     }
 
     /* Glassmorphism Containers */
@@ -64,73 +83,61 @@ st.markdown("""
     /* Custom Buttons */
     .stButton>button {
         width: 100%;
-        background: transparent;
-        color: var(--neon-cyan);
-        border: 1px solid var(--neon-cyan);
+        background: transparent !important;
+        color: var(--neon-cyan) !important;
+        border: 1px solid var(--neon-cyan) !important;
         border-radius: 5px;
-        padding: 10px 20px;
+        padding: 8px 20px;
         font-family: 'Orbitron', sans-serif;
         font-weight: bold;
-        transition: all 0.4s ease;
-        text-transform: uppercase;
+        transition: all 0.2s ease;
     }
 
     .stButton>button:hover {
-        background: var(--neon-cyan);
-        color: black;
+        background: var(--neon-cyan) !important;
+        color: black !important;
         box-shadow: 0 0 20px var(--neon-cyan);
     }
 
-    /* Hide Streamlit Header/Footer */
-    header, footer { visibility: hidden; }
-    #MainMenu { visibility: hidden; }
-
-    /* Blockchain List Styling */
-    .block-item {
-        font-size: 0.8rem;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 5px 0;
-        font-family: 'Courier New', monospace;
+    /* KPI Cards */
+    .kpi-container {
+        display: flex;
+        justify-content: space-between;
+        gap: 15px;
+        margin-bottom: 25px;
+        flex-wrap: wrap;
     }
-    
-    .status-badge {
-        padding: 2px 8px;
+
+    .kpi-card {
+        flex: 1;
+        min-width: 200px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--glass-border);
         border-radius: 10px;
-        font-size: 0.75rem;
-        background: rgba(0, 243, 255, 0.1);
-        color: var(--neon-cyan);
-        border: 1px solid var(--neon-cyan);
+        padding: 15px;
+        text-align: center;
     }
-    /* Responsive Adjustments */
+
+    .kpi-value {
+        font-size: 2rem;
+        font-family: 'Orbitron';
+        color: var(--neon-magenta);
+    }
+
+    /* Responsive */
     @media (max-width: 768px) {
-        .glass-card {
-            padding: 15px;
-            margin-bottom: 10px;
-        }
+        .glass-card { padding: 15px; }
         h1 { font-size: 1.8rem !important; }
-        h2 { font-size: 1.4rem !important; }
-    }
-
-    /* Container Spacing */
-    .main-container {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 0 10px;
-    }
-
-    /* Prevent Scroll */
-    .stApp {
-        overflow-x: hidden;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- LÓGICA DE NEGOCIO (SOLID PRINCIPLES) ---
+# --- MODELS & LOGIC (SOLID) ---
 
 class MeasurementResult:
     def __init__(self, category: str, value: float, metadata: Dict):
         self.id = str(uuid.uuid4())[:8]
-        self.timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+        self.timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.category = category
         self.value = value
         self.metadata = metadata
@@ -142,15 +149,12 @@ class BaseCalculator(ABC):
 
 class BMICalculator(BaseCalculator):
     def calculate(self, weight: float, height: float) -> MeasurementResult:
-        if height <= 0: return None
         bmi = weight / (height ** 2)
-        
-        if bmi < 18.5: category = "Bajo Peso"
-        elif 18.5 <= bmi < 25: category = "Normal"
-        elif 25 <= bmi < 30: category = "Sobrepeso"
-        else: category = "Obesidad"
-        
-        return MeasurementResult(category, round(bmi, 2), {"input": f"{weight}kg, {height}m"})
+        if bmi < 18.5: cat = "Bajo Peso"
+        elif 18.5 <= bmi < 25: cat = "Normal"
+        elif 25 <= bmi < 30: cat = "Sobrepeso"
+        else: cat = "Obesidad"
+        return MeasurementResult(cat, round(bmi, 2), {"input": f"{weight}kg/{height}m"})
 
 class AcademicCalculator(BaseCalculator):
     def calculate(self, name: str, grades: List[float]) -> MeasurementResult:
@@ -159,155 +163,175 @@ class AcademicCalculator(BaseCalculator):
         return MeasurementResult(status, round(avg, 2), {"student": name})
 
 class ChronoCalculator(BaseCalculator):
-    def calculate(self, birth_date: datetime.date) -> MeasurementResult:
-        today = datetime.date.today()
-        months = (today.year - birth_date.year) * 12 + today.month - birth_date.month
-        return MeasurementResult("Tiempo de Vida", float(months), {"birth": str(birth_date)})
+    def calculate(self, dob: datetime.date) -> MeasurementResult:
+        diff = (datetime.date.today().year - dob.year) * 12 + datetime.date.today().month - dob.month
+        return MeasurementResult("Life Duration", float(diff), {"birth": str(dob)})
 
-# --- BLOCKCHAIN SIMULATION (STATE MANAGEMENT) ---
+# --- STATE MANAGER (LEDGER) ---
 
 class LedgerManager:
     def __init__(self):
         if 'ledger' not in st.session_state:
             st.session_state.ledger = []
     
-    def add_entry(self, result: MeasurementResult, module_type: str):
-        entry = {
-            "hash": result.id,
-            "timestamp": result.timestamp,
-            "module": module_type,
-            "metric": result.category,
-            "value": result.value
-        }
-        st.session_state.ledger.insert(0, entry) # Newest first
+    def add(self, res: MeasurementResult, module: str):
+        st.session_state.ledger.insert(0, {
+            "ID": res.id,
+            "Timestamp": res.timestamp,
+            "Module": module,
+            "Status/Value": res.category,
+            "Metric": res.value,
+            **res.metadata
+        })
+    
+    def get_df(self, module: Optional[str] = None):
+        if not st.session_state.ledger: return pd.DataFrame()
+        df = pd.DataFrame(st.session_state.ledger)
+        if module:
+            return df[df["Module"] == module]
+        return df
 
-# --- UI COMPONENTS ---
+# --- UI VIEWS ---
 
-def render_header():
-    cols = st.columns([1, 4, 1])
-    with cols[1]:
-        st.markdown("<h1 style='text-align: center;'>🧬 CYBERMETRIC <span style='color:#ff00ff'>HUB</span></h1>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center; opacity: 0.7; letter-spacing: 1px;'>IMMUTABLE DATA MEASUREMENT SYSTEM v1.0</p>", unsafe_allow_html=True)
+def view_dashboard(ledger: LedgerManager):
+    st.markdown("## 📊 SYSTEM DASHBOARD")
+    df = ledger.get_df()
+    
+    if df.empty:
+        st.info("No data in the ledger yet. Start by using any module on the sidebar!")
+        return
+
+    # KPI Layout
+    kpis = st.columns(4)
+    with kpis[0]:
+        st.markdown(f'<div class="kpi-card"><p>TOTAL BLOCKS</p><div class="kpi-value">{len(df)}</div></div>', unsafe_allow_html=True)
+    with kpis[1]:
+        avg_bmi = df[df["Module"] == "BIO-METRIC"]["Metric"].mean()
+        st.markdown(f'<div class="kpi-card"><p>AVG BMI</p><div class="kpi-value">{round(avg_bmi,1) if not pd.isna(avg_bmi) else "0"}</div></div>', unsafe_allow_html=True)
+    with kpis[2]:
+        avg_pts = df[df["Module"] == "ACADEMIC"]["Metric"].mean()
+        st.markdown(f'<div class="kpi-card"><p>GRADES AVG</p><div class="kpi-value">{round(avg_pts,1) if not pd.isna(avg_pts) else "0"}</div></div>', unsafe_allow_html=True)
+    with kpis[3]:
+        max_months = df[df["Module"] == "CHRONO"]["Metric"].max()
+        st.markdown(f'<div class="kpi-card"><p>MAX MONTHS</p><div class="kpi-value">{int(max_months) if not pd.isna(max_months) else "0"}</div></div>', unsafe_allow_html=True)
+
+    # Charts
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        fig_pie = px.pie(df, names="Module", title="DISTRIBUCIÓN DE REGISTROS", color_discrete_sequence=px.colors.sequential.Electric)
+        fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color="white", plot_bgcolor='rgba(0,0,0,0)')
+        st.plotly_chart(fig_pie, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    with c2:
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        fig_line = px.line(df.sort_values("Timestamp"), x="Timestamp", y="Metric", color="Module", title="TENDENCIA DE MÉTRICAS", markers=True)
+        fig_line.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color="white", plot_bgcolor='rgba(0,0,0,0)')
+        st.plotly_chart(fig_line, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+def view_module_bmi(ledger: LedgerManager):
+    st.markdown("## 🏃 BIO-METRICO (IMC)")
+    
+    with st.container():
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            st.markdown('<div class="glass-card neon-border-cyan">', unsafe_allow_html=True)
+            w = st.number_input("Peso (kg)", 1.0, 300.0, 70.0)
+            h = st.number_input("Estatura (m)", 0.5, 2.5, 1.75)
+            if st.button("CALCULAR E INDEXAR"):
+                calc = BMICalculator()
+                res = calc.calculate(w, h)
+                ledger.add(res, "BIO-METRIC")
+                st.balloons()
+                st.success(f"BLOCK {res.id} GENERATED: {res.category} ({res.value})")
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+            st.markdown("### HISTORIAL FILTRADO")
+            df_m = ledger.get_df("BIO-METRIC")
+            if not df_m.empty:
+                st.dataframe(df_m[["ID", "Timestamp", "Status/Value", "Metric"]], use_container_width=True)
+            else:
+                st.write("Sin registros en este módulo.")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+def view_module_academic(ledger: LedgerManager):
+    st.markdown("## 🎓 ACADÉMICO")
+    
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        st.markdown('<div class="glass-card neon-border-magenta">', unsafe_allow_html=True)
+        name = st.text_input("ID del Estudiante", "USER_0x1")
+        g1 = st.slider("Nota Parcial 1", 0.0, 5.0, 3.5)
+        g2 = st.slider("Nota Parcial 2", 0.0, 5.0, 4.0)
+        g3 = st.slider("Examen Final", 0.0, 5.0, 2.5)
+        if st.button("CALCULAR PROMEDIO"):
+            calc = AcademicCalculator()
+            res = calc.calculate(name, [g1, g2, g3])
+            ledger.add(res, "ACADEMIC")
+            st.toast(f"Student: {res.category} with {res.value}", icon='🎓')
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with col2:
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.markdown("### HISTORIAL ACADÉMICO")
+        df_a = ledger.get_df("ACADEMIC")
+        if not df_a.empty:
+            st.dataframe(df_a[["ID", "Timestamp", "Status/Value", "Metric", "student"]], use_container_width=True)
+        else:
+            st.write("Esperando datos...")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+def view_module_chrono(ledger: LedgerManager):
+    st.markdown("## 🕰️ CRONO-LOG")
+    
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        dob = st.date_input("Fecha de Nacimiento", value=datetime.date(2000, 1, 1), 
+                            min_value=datetime.date(1960, 1, 1), max_value=datetime.date.today())
+        if st.button("ANALIZAR TIEMPO"):
+            calc = ChronoCalculator()
+            res = calc.calculate(dob)
+            ledger.add(res, "CHRONO")
+            st.success(f"Total meses en la red: {int(res.value)}")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with col2:
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.markdown("### HISTORIAL CRONO")
+        df_c = ledger.get_df("CHRONO")
+        if not df_c.empty:
+            st.dataframe(df_c[["ID", "Timestamp", "Metric", "birth"]], use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# --- MAIN RUNNER ---
 
 def main():
     ledger = LedgerManager()
     
-    # Header logic
-    render_header()
-    
-    # Main Dashboard Columns
-    col1, col2, col3 = st.columns(3)
-    
-    # --- MODULO BIO-METRICO ---
-    with col1:
-        st.markdown('<div class="glass-card neon-border-cyan">', unsafe_allow_html=True)
-        st.markdown("### 🏃 BIO-METRIC (IMC)")
-        weight = st.number_input("Peso (kg)", min_value=1.0, max_value=300.0, value=70.0)
-        height = st.number_input("Estatura (m)", min_value=0.5, max_value=2.5, value=1.75)
+    # Sidebar
+    with st.sidebar:
+        st.markdown('<div class="sidebar-title">🧬 CYBER NAV v2</div>', unsafe_allow_html=True)
+        choice = st.radio("MÓDULOS DE RED", 
+                         ["🏠 Dashboard", "🏃 Bio-Metric", "🎓 Académico", "🕰️ Crono-Log"],
+                         index=0)
         
-        if st.button("CALCULAR IMC"):
-            calc = BMICalculator()
-            res = calc.calculate(weight, height)
-            ledger.add_entry(res, "BIO-METRIC")
-            
-            # Aura UX Colors
-            color = "#00f3ff" if res.category == "Normal" else "#ff00ff" if "Peso" in res.category else "#f3ff00"
-            st.markdown(f"""
-                <div style='background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; margin-top: 10px; text-align: center; border: 1px solid {color}'>
-                    <h4 style='color: {color}; margin: 0;'>{res.category}</h4>
-                    <h2 style='color: white; margin: 5px 0;'>{res.value}</h2>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            # BMI Scale visualization
-            progress = min(max((res.value - 15) / (40 - 15), 0.0), 1.0)
-            st.progress(progress)
-            st.caption("15 (Bajo) ----------------- 25 (Normal) ----------------- 40 (Obesidad)")
-            
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown("<br><hr>", unsafe_allow_html=True)
+        st.caption("BLOCKCHAIN-SDK v12.4.0 (SIMULATED)")
 
-    # --- MODULO ACADEMICO ---
-    with col2:
-        st.markdown('<div class="glass-card neon-border-magenta">', unsafe_allow_html=True)
-        st.markdown("### 🎓 ACADÉMICO")
-        name = st.text_input("Nombre del Estudiante", "USER_0x1")
-        g1 = st.slider("Nota 1", 0.0, 5.0, 3.5)
-        g2 = st.slider("Nota 2", 0.0, 5.0, 4.0)
-        g3 = st.slider("Nota 3", 0.0, 5.0, 2.5)
-        
-        if st.button("GENERAR REPORTE"):
-            calc = AcademicCalculator()
-            res = calc.calculate(name, [g1, g2, g3])
-            ledger.add_entry(res, "ACADEMIC")
-            
-            status_color = "#00ff00" if res.category == "Aprobado" else "#ff0000"
-            st.markdown(f"""
-                <div style='background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; margin-top: 10px; text-align: center;'>
-                    <p style='margin:0; opacity: 0.6;'>Promedio Final</p>
-                    <h2 style='color: white; margin: 0;'>{res.value}</h2>
-                    <h3 style='color: {status_color}; text-shadow: 0 0 10px {status_color}55;'>{res.category}</h3>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            # Multi-progress bar view
-            st.write("Distribution:")
-            st.progress(g1/5, text=f"Grade 1: {g1}")
-            st.progress(g2/5, text=f"Grade 2: {g2}")
-            st.progress(g3/5, text=f"Grade 3: {g3}")
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # --- MODULO CRONOLOGICO ---
-    with col3:
-        st.markdown('<div class="glass-card neon-border-cyan">', unsafe_allow_html=True)
-        st.markdown("### 🕰️ CRONO-LOG")
-        dob = st.date_input(
-            "Fecha de Nacimiento", 
-            value=datetime.date(2000, 1, 1),
-            min_value=datetime.date(1960, 1, 1),
-            max_value=datetime.date.today()
-        )
-        
-        if st.button("CRONOMETRAR"):
-            calc = ChronoCalculator()
-            res = calc.calculate(dob)
-            ledger.add_entry(res, "CHRONO")
-            
-            st.markdown(f"""
-                <div style='background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; margin-top: 10px; text-align: center; border-bottom: 2px solid var(--neon-magenta)'>
-                    <p style='margin:0; opacity: 0.6;'>Has vivido aproximadamente</p>
-                    <h1 style='color: var(--neon-cyan); margin: 10px 0;'>{int(res.value)}</h1>
-                    <p style='margin:0; font-family: Orbitron;'>MESES EN LA RED</p>
-                </div>
-            """, unsafe_allow_html=True)
-        
-        st.markdown("<br><br>", unsafe_allow_html=True)
-        st.image("https://img.icons8.com/neon/96/time.png") # Simulated asset
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # --- LEDGER INMUTABLE (HISTORIAL) ---
-    st.markdown("### ⛓️ LEDGER DE TRANSACCIONES (HISTORIAL INMUTABLE)")
-    if st.session_state.ledger:
-        # Create a more visual history
-        cols_hist = st.columns(4)
-        for i, entry in enumerate(st.session_state.ledger[:4]): # Show last 4 in grid
-             with cols_hist[i]:
-                st.markdown(f"""
-                <div class="glass-card" style="padding: 10px; font-size: 0.8rem; border-color: rgba(0,243,255, 0.3)">
-                    <span class="status-badge">{entry['module']}</span>
-                    <p style="margin: 5px 0 0 0; color: #aaa;">ID: {entry['hash']}</p>
-                    <p style="margin: 0; font-weight: bold;">{entry['metric']}: {entry['value']}</p>
-                    <p style="margin: 0; font-size: 0.7rem; opacity: 0.5;">TS: {entry['timestamp']}</p>
-                </div>
-                """, unsafe_allow_html=True)
-        
-        # Table view for the rest
-        if len(st.session_state.ledger) > 4:
-            with st.expander("VER CADENA COMPLETA"):
-                df = pd.DataFrame(st.session_state.ledger)
-                st.dataframe(df, use_container_width=True)
-    else:
-        st.info("No hay registros en el Ledger. Comienza a calcular para generar la cadena.")
+    # Routing
+    if choice == "🏠 Dashboard":
+        view_dashboard(ledger)
+    elif choice == "🏃 Bio-Metric":
+        view_module_bmi(ledger)
+    elif choice == "🎓 Académico":
+        view_module_academic(ledger)
+    elif choice == "🕰️ Crono-Log":
+        view_module_chrono(ledger)
 
 if __name__ == "__main__":
     main()

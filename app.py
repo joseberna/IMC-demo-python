@@ -261,7 +261,12 @@ def main():
     with col3:
         st.markdown('<div class="glass-card neon-border-cyan">', unsafe_allow_html=True)
         st.markdown("### 🕰️ CRONO-LOG")
-        dob = st.date_input("Fecha de Nacimiento", datetime.date(2000, 1, 1))
+        dob = st.date_input(
+            "Fecha de Nacimiento", 
+            value=datetime.date(2000, 1, 1),
+            min_value=datetime.date(1960, 1, 1),
+            max_value=datetime.date.today()
+        )
         
         if st.button("CRONOMETRAR"):
             calc = ChronoCalculator()
